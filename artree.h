@@ -8,6 +8,7 @@
 #ifndef ARTREE_H_
 #define ARTREE_H_
 
+#include <cstring>
 #include <emmintrin.h>
 
 class artree{
@@ -142,8 +143,35 @@ public:
 		return node->type == leaf || node->type == leaf4 || node->type == leaf16 || node->type == leaf48 || node->type == leaf256;
 	}
 
+	bool isFull(node* node_){
+		switch(node_->type){
+		case node4:
+			return ((inner_node4*)node_)->count == 4;
+			break;
+		case node16:
+			return ((inner_node16*)node_)->count == 16;
+			break;
+		case node48:
+			return ((inner_node48*)node_)->count == 48;
+			break;
+		case node256:
+			return ((inner_node256*)node_)->count == 256;
+			break;
+		default:
+			return false;
+		}
+	}
+
 	short checkPrefix(node* node,char* key, short depth) {
 		return 0;
+	}
+
+	void addChild(node* parent, char byte, node* child){
+
+	}
+
+	void grow(node* node_) {
+
 	}
 
 	node* findChild(node* node, char byte) {
@@ -186,38 +214,42 @@ public:
 		}
 	}
 
-	node* search(node* node, char* key, short depth) {
+	bool leafMatches(node* node_, char* key, short depth) {
+		return true;
+	}
+
+	node* search(node* node_, char* key, short depth) {
 		if(node == NULL)
 		{
 			return NULL;
 		}
-		if(isLeaf(node))
+		if(isLeaf(node_))
 		{
-			if(leafMatches(node,key,depth))
+			if(leafMatches(node_,key,depth))
 			{
-				return node;
+				return node_;
 			}
 			return NULL;
 		}
-		if(checkPrefix(node,key,depth) != node->prefixLen)
+		if(checkPrefix(node_,key,depth) != node_->prefixLen)
 		{
 			return NULL;
 		}
-		depth += node->prefixLen;
-		node* next = findChild(node,key[depth]);
+		depth += node_->prefixLen;
+		node* next = findChild(node_,key[depth]);
 		return search(next,key,depth+1);
 	}
 
-	void insert(node* node, char* key, node* leaf, short depth) {
-		if(node == NULL)
+	void insert(node* node_, char* key, node* leaf, short depth) {
+		if(node_ == NULL)
 		{
-			replace(node,leaf);
+			node_ = leaf;
 			return;
 		}
 		if(isLeaf(node))
 		{
 			inner_node4* newNode = new inner_node4();
-			char* key2 = loadKey(node);
+			char* key2 = loadKey(node_);
 			short i = depth;
 			for(; key[i] == key2[i]; i++)
 			{
@@ -226,33 +258,35 @@ public:
 			newNode->prefixLen = i-depth;
 			depth += newNode->prefixLen;
 			addChild(newNode, key[depth],leaf);
-			addChild(newNode, key2[depth],node);
-			replace(node,newNode);
+			addChild(newNode, key2[depth],node_);
+			//TODO: Free node
+			node_ = newNode;
 			return;
 		}
-		short p = checkPrefix(node,key,depth);
-		if(p != node->prefixLen)
+		short p = checkPrefix(node_,key,depth);
+		if(p != node_->prefixLen)
 		{
 			inner_node4 *newNode = new inner_node4();
 			addChild(newNode, key[depth+p], leaf);
-			addChild(newNode, node->prefix[p], node);
+			addChild(newNode, node_->prefix[p], node_);
 			newNode->prefix = p;
-			memcpy(newNode->prefix,node->prefix,p);
-			node->prefixLen = node->prefixLen-(p+1);
-			memmove(node->prefix,node->prefix+p+1;node->prefixLen);
-			replace(node,newNode);
+			memcpy(newNode->prefix,node_->prefix,p);
+			node_->prefixLen = node_->prefixLen-(p+1);
+			memmove(node_->prefix,node_->prefix+p+1,node_->prefixLen);
+			//Free node_!!
+			node_ = newNode;
 			return;
 		}
-		depth=depth+node->prefixLen;
-		node *next = findChild(node,key[depth])
+		depth=depth+node_->prefixLen;
+		node *next = findChild(node_,key[depth]);
 		if(next){
 			insert(next,key,leaf,depth+1);
 		}else{
-			if(isFull(node))
+			if(isFull(node_))
 			{
-				grow(node);
+				grow(node_);
 			}
-			addChild(node,key[depth], leaf);
+			addChild(node_, key[depth], leaf);
 		}
 	}
 
