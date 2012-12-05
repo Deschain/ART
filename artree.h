@@ -99,7 +99,6 @@ class artree{
 			count = 0;
 			prefixLen = 0;
 		}
-
 	};
 
 	struct leaf_node16: public node {
@@ -111,7 +110,6 @@ class artree{
 			count = 0;
 			prefixLen = 0;
 		}
-
 	};
 
 	struct leaf__node48: public node {
@@ -123,7 +121,6 @@ class artree{
 			count = 0;
 			prefixLen = 0;
 		}
-
 	};
 
 	struct leaf__node256: public node{
@@ -137,7 +134,7 @@ class artree{
 		}
 	};
 
-public:
+private:
 
 	bool isLeaf(node* node){
 		return node->type == leaf || node->type == leaf4 || node->type == leaf16 || node->type == leaf48 || node->type == leaf256;
@@ -162,23 +159,66 @@ public:
 		}
 	}
 
-	short checkPrefix(node* node,char* key, short depth) {
-		return 0;
+	short checkPrefix(node* node_, char* key, short depth) {
+		short counter = 0;
+		for(short i = 0; i < 8; i++){
+			if(node_->prefix[i] == key[depth+i])
+			{
+				counter++;
+			}else{
+				return counter;
+			}
+		}
+		return counter;
 	}
 
 	void addChild(node* parent, char byte, node* child){
-
+		switch(parent->type)
+		{
+		case node4:
+			inner_node4* inner_node_4 = (inner_node4*)node;
+			inner_node_4->key[inner_node_4->count] = byte;
+			inner_node_4->child[inner_node_4->count] = child;
+			break;
+		case node16:
+			inner_node16* inner_node_16 = (inner_node16*)node;
+			inner_node_16->key[inner_node_16->count] = byte;
+			inner_node_16->child[inner_node_16->count] = child;
+			break;
+		case node48:
+			inner_node48* inner_node_48 = (inner_node48*)node;
+			inner_node_48->key[byte] = inner_node_48->count;
+			inner_node_48->child[inner_node_48->count] = child;
+			break;
+		case node256:
+			inner_node256* inner_node_256 = (inner_node256*)node;
+			inner_node_256->child[byte] = child;
+			break;
+		}
+		parent->count++;
+		parent->prefix[parent->prefixLen] = byte;
+		parent->prefixLen++;
 	}
 
 	void grow(node* node_) {
-
+		switch(node_->type)
+		{
+		case node4:
+			break;
+		case node16:
+			break;
+		case node48:
+			break;
+		case node256:
+			break;
+		}
 	}
 
-	node* findChild(node* node, char byte) {
-		if(node->type == node4)
+	node* findChild(node* node_, char byte) {
+		if(node_->type == node4)
 		{
-			inner_node4 *inner_node = (inner_node4*)node;
-			for(int i; i < node->count; i++)
+			inner_node4 *inner_node = (inner_node4*)node_;
+			for(int i; i < node_->count; i++)
 			{
 				if(inner_node->key[i] == byte)
 				{
@@ -187,19 +227,20 @@ public:
 			}
 			return NULL;
 		}
-		if(node->type == node16)
+		if(node_->type == node16)
 		{
 			//SSE comparation
 			int key = _mm_set1_epi8(byte);
-			int cmp = _mm_cmpeq_epi8(key,node->prefixLen);
-			int mask = (1<<node->count) -1;
+			int cmp = _mm_cmpeq_epi8(key,node_->prefixLen);
+			int mask = (1<<node_->count) - 1;
 			int bitfield = _mm_movemask_epi8(cmp) & mask;
 			if(bitfield)
 			{
-				((inner_node16*)node)->child[/*ctz(bitfield)*/];
+				//TODO: Find count trailing zero
+				((inner_node16*)node)->child[0/*ctz(bitfield)*/];
 			}
 		}
-		if(node->type == node48)
+		if(node_->type == node48)
 		{
 			inner_node48 *inner_node = (inner_node48*)node ;
 			if(inner_node->key[byte] != 0)
@@ -208,7 +249,7 @@ public:
 			}
 			return NULL;
 		}
-		if(node->type == node256)
+		if(node_->type == node256)
 		{
 			return ((inner_node256*)node)->child[byte];
 		}
@@ -217,6 +258,8 @@ public:
 	bool leafMatches(node* node_, char* key, short depth) {
 		return true;
 	}
+
+public:
 
 	node* search(node* node_, char* key, short depth) {
 		if(node == NULL)
