@@ -9,7 +9,8 @@
 #define ARTREE_H_
 
 #include <cstring>
-#include <emmintrin.h>
+#include <vector>
+#include <string>
 
 class artree{
 
@@ -23,6 +24,9 @@ class artree{
 	static const short leaf48	  = 8;
 	static const short leaf256	  = 9;
 
+	std::vector<std::string> dictionary;
+
+public:
 
 	struct node{
 		unsigned short type;
@@ -79,10 +83,10 @@ class artree{
 		}
 	};
 
-	struct leaf_node_single : public node{
-		char value;
+	struct leaf_node: public node{
+		unsigned value;
 
-		leaf_node_single()
+		leaf_node()
 		{
 			type = leaf;
 			count = 0;
@@ -91,7 +95,7 @@ class artree{
 	};
 
 	struct leaf_node4 :public node{
-		char value[4];
+		unsigned value[4];
 
 		leaf_node4()
 		{
@@ -102,7 +106,7 @@ class artree{
 	};
 
 	struct leaf_node16: public node {
-		char value[16];
+		unsigned value[16];
 
 		leaf_node16()
 		{
@@ -113,7 +117,7 @@ class artree{
 	};
 
 	struct leaf__node48: public node {
-		char value[48];
+		unsigned value[48];
 
 		leaf__node48()
 		{
@@ -124,7 +128,7 @@ class artree{
 	};
 
 	struct leaf__node256: public node{
-		char value[256];
+		unsigned value[256];
 
 		leaf__node256()
 		{
@@ -133,6 +137,8 @@ class artree{
 			prefixLen = 0;
 		}
 	};
+
+	node* root;
 
 private:
 
@@ -159,7 +165,7 @@ private:
 		}
 	}
 
-	short checkPrefix(node* node_, char* key, short depth) {
+	short checkPrefix(node* node_, const char* key, short depth) {
 		short counter = 0;
 		for(short i = 0; i < 8; i++){
 			if(node_->prefix[i] == key[depth+i])
@@ -176,23 +182,31 @@ private:
 		switch(parent->type)
 		{
 		case node4:
-			inner_node4* inner_node_4 = (inner_node4*)node;
-			inner_node_4->key[inner_node_4->count] = byte;
-			inner_node_4->child[inner_node_4->count] = child;
+			{
+				inner_node4* inner_node = (inner_node4*)parent;
+				inner_node->key[inner_node->count] = byte;
+				inner_node->child[inner_node->count] = child;
+			}
 			break;
 		case node16:
-			inner_node16* inner_node_16 = (inner_node16*)node;
-			inner_node_16->key[inner_node_16->count] = byte;
-			inner_node_16->child[inner_node_16->count] = child;
+			{
+				inner_node16* inner_node = (inner_node16*)parent;
+				inner_node->key[inner_node->count] = byte;
+				inner_node->child[inner_node->count] = child;
+			}
 			break;
 		case node48:
-			inner_node48* inner_node_48 = (inner_node48*)node;
-			inner_node_48->key[byte] = inner_node_48->count;
-			inner_node_48->child[inner_node_48->count] = child;
+			{
+				inner_node48* inner_node = (inner_node48*)parent;
+				inner_node->key[byte] = inner_node->count;
+				inner_node->child[inner_node->count] = child;
+			}
 			break;
 		case node256:
-			inner_node256* inner_node_256 = (inner_node256*)node;
-			inner_node_256->child[byte] = child;
+			{
+				inner_node256* inner_node = (inner_node256*)parent;
+				inner_node->child[byte] = child;
+			}
 			break;
 		}
 		parent->count++;
@@ -204,12 +218,41 @@ private:
 		switch(node_->type)
 		{
 		case node4:
+		{
+			inner_node4  * oldNode = (inner_node4*)node_;
+			inner_node16 * newNode = new inner_node16();
+			newNode->count = oldNode->count;
+			newNode->prefixLen = oldNode->prefixLen;
+			memcpy(newNode->prefix,oldNode->prefix,8);
+			memcpy(newNode->key,oldNode->key,4);
+			memcpy(newNode->child,oldNode->child,4);
+			node_ = newNode;
+		}
 			break;
 		case node16:
+		{
+			inner_node16  * oldNode = (inner_node16*)node_;
+			inner_node48  * newNode = new inner_node48();
+			newNode->count = oldNode->count;
+			newNode->prefixLen = oldNode->prefixLen;
+			for(short i = 0; i < 16; i++){
+				newNode->key[oldNode->key[i]] = i;
+			}
+			memcpy(newNode->child,oldNode->child,16);
+			node_ = newNode;
+		}
 			break;
 		case node48:
+		{
+			inner_node48  * oldNode = (inner_node48*)node_;
+			inner_node256 * newNode = new inner_node256();
+			newNode->count = oldNode->count;
+			newNode->prefixLen = oldNode->prefixLen;
+			node_ = newNode;
+		}
 			break;
 		case node256:
+			//TODO: How to grow the biggest node?
 			break;
 		}
 	}
@@ -229,20 +272,19 @@ private:
 		}
 		if(node_->type == node16)
 		{
-			//SSE comparation
-			int key = _mm_set1_epi8(byte);
-			int cmp = _mm_cmpeq_epi8(key,node_->prefixLen);
-			int mask = (1<<node_->count) - 1;
-			int bitfield = _mm_movemask_epi8(cmp) & mask;
-			if(bitfield)
+			inner_node16 *inner_node = (inner_node16*)node_;
+			for(int i; i < node_->count; i++)
 			{
-				//TODO: Find count trailing zero
-				((inner_node16*)node)->child[0/*ctz(bitfield)*/];
+				if(inner_node->key[i] == byte)
+				{
+					return inner_node->child[i];
+				}
 			}
+			return NULL;
 		}
 		if(node_->type == node48)
 		{
-			inner_node48 *inner_node = (inner_node48*)node ;
+			inner_node48 *inner_node = (inner_node48*)node_;
 			if(inner_node->key[byte] != 0)
 			{
 				return inner_node->child[inner_node->key[byte]];
@@ -251,18 +293,34 @@ private:
 		}
 		if(node_->type == node256)
 		{
-			return ((inner_node256*)node)->child[byte];
+			return ((inner_node256*)node_)->child[byte];
 		}
 	}
 
 	bool leafMatches(node* node_, char* key, short depth) {
-		return true;
+		const char* nodeKey = loadKey((leaf_node*)node_);
+		return memcmp(nodeKey,key,depth) == 0;
+	}
+
+	const char* loadKey(leaf_node* leaf){
+		return dictionary.at(leaf->value).c_str();
 	}
 
 public:
 
+	artree(){
+		root = new inner_node4();
+	}
+
+	node* createLeaf(const char* key) {
+		leaf_node* newLeaf = new leaf_node();
+		dictionary.push_back(key);
+		newLeaf->value = dictionary.size() - 1;
+		return newLeaf;
+	}
+
 	node* search(node* node_, char* key, short depth) {
-		if(node == NULL)
+		if(node_ == NULL)
 		{
 			return NULL;
 		}
@@ -283,16 +341,16 @@ public:
 		return search(next,key,depth+1);
 	}
 
-	void insert(node* node_, char* key, node* leaf, short depth) {
+	void insert(node* node_, const char* key, node* leaf, short depth) {
 		if(node_ == NULL)
 		{
 			node_ = leaf;
 			return;
 		}
-		if(isLeaf(node))
+		if(isLeaf(node_))
 		{
 			inner_node4* newNode = new inner_node4();
-			char* key2 = loadKey(node_);
+			const char* key2 = loadKey((leaf_node*)node_);
 			short i = depth;
 			for(; key[i] == key2[i]; i++)
 			{
@@ -312,11 +370,11 @@ public:
 			inner_node4 *newNode = new inner_node4();
 			addChild(newNode, key[depth+p], leaf);
 			addChild(newNode, node_->prefix[p], node_);
-			newNode->prefix = p;
+			newNode->prefixLen = p;
 			memcpy(newNode->prefix,node_->prefix,p);
 			node_->prefixLen = node_->prefixLen-(p+1);
 			memmove(node_->prefix,node_->prefix+p+1,node_->prefixLen);
-			//Free node_!!
+			//TODO: Free node_
 			node_ = newNode;
 			return;
 		}

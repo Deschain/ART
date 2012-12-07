@@ -1,4 +1,0 @@
-art
-===
-
-Adaptative Radix Tree
