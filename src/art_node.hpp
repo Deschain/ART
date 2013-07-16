@@ -2,24 +2,6 @@
 
 #include <cstdint>
 
-/*
-   switch(node_->type_)
-        {
-             case ART_NODE_004:
-                 {}
-                 break;
-             case ART_NODE_016:
-                 {}
-                 break;
-             case ART_NODE_048:
-                 {}
-                 break;
-             case ART_NODE_256:
-                 {}
-                 break;
-        }
-*/
-
 namespace art{
 
     const uint8_t ART_NODE_004 = 0;
@@ -156,7 +138,7 @@ public:
     **/
     art_node* create_leaf(const size_t index)
     {
-        return (art_node*) ((index << 1) + 1);
+        return (art_node*) ((index << 1) | 1);
     }
 
     bool is_leaf(const art_node* node)
@@ -166,9 +148,9 @@ public:
 
     /**
      * The value of the leaf node is calculated by shifting rigth the pointer tag bit
-     * NOTE: The maximun value a leaf can store would be SIZE_MAX/2 (with 32 bits lenght size_t it would be 2^31)
+     * NOTE: The maximun value a leaf can store would be uintptr_t/2 (with 32 bits lenght uintptr_t it would be 2^31)
     **/
-    size_t recover_leaf(const art_node* leaf)
+    uintptr_t recover_leaf(const art_node* leaf)
     {		
         return (size_t) ((uintptr_t)leaf >> 1);
     }
